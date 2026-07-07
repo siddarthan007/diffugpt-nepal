@@ -187,18 +187,12 @@ def estimate_loss():
     return out
 
 
-def save_ckpt(path, step):
+def save_ckpt(path, step, with_optim=True):
     raw = model._orig_mod if hasattr(model, "_orig_mod") else model
-    torch.save(
-        {
-            "model": raw.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "args": args,
-            "step": step,
-            "best_val_loss": best_val_loss,
-        },
-        path,
-    )
+    payload = {"model": raw.state_dict(), "args": args, "step": step, "best_val_loss": best_val_loss}
+    if with_optim:  # only the resume checkpoint needs optimizer state (~400MB)
+        payload["optimizer"] = optimizer.state_dict()
+    torch.save(payload, path)
 
 
 # --- training loop ---
@@ -217,7 +211,7 @@ try:
             print(f"\n---> step {it:05d}: train {losses['train']:.4f} | val {losses['val']:.4f} | lr {lr:.2e}")
             if losses["val"] < best_val_loss:
                 best_val_loss = losses["val"]
-                save_ckpt(best_ckpt_path, it)
+                save_ckpt(best_ckpt_path, it, with_optim=False)  # inference-only -> small
                 print("     [best checkpoint saved]")
             save_ckpt(ckpt_path, it)  # latest — always, so resume continues from here
             if decode is not None:
