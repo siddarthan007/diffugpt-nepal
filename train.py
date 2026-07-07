@@ -91,8 +91,12 @@ n_params_non_emb = n_params - model.token_embedding.weight.numel()
 print(f"  params: {n_params/1e6:.1f}M total | {n_params_non_emb/1e6:.1f}M non-embedding")
 
 if compile_model:
-    print("Compiling model (max-autotune, ~2-3 min first time)...")
-    model = torch.compile(model, mode="max-autotune")
+    # NOTE: use *-no-cudagraphs. Plain "max-autotune" captures CUDA graphs, which
+    # break with our tied embedding (token_embedding.weight is lm_head.weight -> used
+    # twice) + grad-accum + interleaved eval/sample: "accessing tensor output of
+    # CUDAGraphs that has been overwritten". This keeps Triton autotuning, drops graphs.
+    print("Compiling model (max-autotune-no-cudagraphs, ~2-3 min first time)...")
+    model = torch.compile(model, mode="max-autotune-no-cudagraphs")
 
 use_fused = 'fused' in inspect.getfullargspec(torch.optim.AdamW).args
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, betas=(0.9, 0.95),
