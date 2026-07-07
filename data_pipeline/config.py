@@ -39,7 +39,9 @@ SOURCES = {
         "holdout": 0.02,
     },
     "indiccorp": {
-        "loader": ("hf", {"path": "ai4bharat/IndicCorpV2", "data_dir": "data/npi_Deva", "split": "train"}),
+        # Nepali is a single plain-text file data/ne.txt (verified via HF tree API),
+        # loaded through the generic text builder — NOT a data_dir config.
+        "loader": ("hf", {"path": "ai4bharat/IndicCorpV2", "data_files": "data/ne.txt", "split": "train"}),
         "text_col": "text",
         "max_chars": 60_000_000,
         "min_dev_ratio": 0.35,
