@@ -1,0 +1,16 @@
+# --- training / inference ---
+torch>=2.4
+numpy>=1.26
+sentencepiece>=0.2.0
+
+# --- Phase-A data pipeline ---
+datasets>=2.19
+huggingface_hub>=0.23
+requests>=2.31
+datasketch>=1.6           # MinHash + LSH fuzzy dedup
+indic-nlp-library>=0.92   # Devanagari normalization
+
+# --- serving / eval (later phases) ---
+fastapi>=0.111
+uvicorn[standard]>=0.30
+mauve-text>=0.4           # eval only

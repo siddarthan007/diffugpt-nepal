@@ -1,0 +1,230 @@
+/* ============================================================
+   Nepali Diffusion — editorial / lokta-paper aesthetic
+   Restraint: one accent (muted crimson), no gradients, no glass.
+   ============================================================ */
+:root{
+  --paper:#F3EEE3;
+  --paper-2:#EAE3D4;
+  --card:#FBF8F1;
+  --ink:#211E19;
+  --ink-soft:#6E675B;
+  --ink-faint:#A79E8C;
+  --line:rgba(33,30,25,.12);
+  --line-2:rgba(33,30,25,.06);
+  --crimson:#9C2A22;
+  --crimson-bright:#C1362B;
+  --indigo:#2C3A54;
+  --gold:#A9812F;
+
+  --stage:#14161B;
+  --stage-2:#1B1E25;
+  --stage-line:rgba(232,226,212,.10);
+  --stage-ink:#E7E1D3;
+  --stage-mut:#7E8798;
+
+  --serif:'Noto Serif Devanagari','Tiro Devanagari Sanskrit',Georgia,serif;
+  --sans:'Noto Sans Devanagari',system-ui,-apple-system,sans-serif;
+  --latin:'Inter',system-ui,sans-serif;
+
+  --sp:clamp(16px,2.2vw,26px);
+  --radius:14px;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  line-height:1.6;
+  min-height:100vh;
+  display:flex;flex-direction:column;
+  letter-spacing:.005em;
+}
+
+/* faint paper grain, drawn not imaged */
+.grain{
+  position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  background-image:radial-gradient(var(--line-2) .5px,transparent .5px);
+  background-size:4px 4px;mix-blend-mode:multiply;
+}
+
+/* ---------- header ---------- */
+.site-head{
+  position:relative;z-index:1;
+  padding:calc(var(--sp)*1.4) var(--sp) var(--sp);
+  max-width:980px;margin:0 auto;width:100%;
+}
+.brand{display:flex;align-items:center;gap:18px}
+.mark{width:38px;height:38px;color:var(--crimson);flex:none}
+.brand-text h1{
+  font-family:var(--serif);font-weight:700;
+  font-size:clamp(26px,4.4vw,40px);
+  margin:0;letter-spacing:-.01em;line-height:1.05;
+}
+.tag{
+  margin:.35em 0 0;color:var(--ink-soft);
+  font-family:var(--latin);font-size:13px;letter-spacing:.01em;
+}
+.badge{
+  font-family:var(--latin);font-size:11px;font-weight:500;
+  text-transform:uppercase;letter-spacing:.14em;
+  padding:2px 8px;border-radius:999px;border:1px solid var(--line);
+  color:var(--ink-soft);vertical-align:2px;
+}
+.badge.live{color:var(--crimson);border-color:rgba(156,42,34,.4)}
+.badge.demo{color:var(--gold);border-color:rgba(169,129,47,.4)}
+
+main{
+  position:relative;z-index:1;
+  max-width:980px;margin:0 auto;width:100%;
+  padding:0 var(--sp) var(--sp);
+  display:flex;flex-direction:column;gap:var(--sp);
+  flex:1;
+}
+
+/* ---------- panels ---------- */
+.panel{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:calc(var(--sp)*.9);
+}
+
+/* ---------- controls ---------- */
+.controls{display:flex;flex-direction:column;gap:18px}
+.field{display:flex;flex-direction:column;gap:8px;min-width:0}
+.field label{
+  font-family:var(--latin);font-size:12px;font-weight:500;
+  text-transform:uppercase;letter-spacing:.12em;color:var(--ink-soft);
+  display:flex;justify-content:space-between;gap:8px;align-items:baseline;
+}
+.field label span{color:var(--ink-faint);letter-spacing:.06em;text-transform:none;font-size:12px}
+.field-prompt input{
+  font-family:var(--sans);font-size:19px;color:var(--ink);
+  background:transparent;border:none;border-bottom:1.5px solid var(--line);
+  padding:8px 2px;outline:none;transition:border-color .2s;
+}
+.field-prompt input::placeholder{color:var(--ink-faint)}
+.field-prompt input:focus{border-color:var(--crimson)}
+
+.sliders{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.row{display:flex}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;height:2px;background:var(--line);
+  border-radius:2px;outline:none;margin:10px 0 0;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--paper);border:1.5px solid var(--crimson);cursor:pointer;transition:transform .15s;
+}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+input[type=range]::-moz-range-thumb{
+  width:14px;height:14px;border-radius:50%;background:var(--paper);
+  border:1.5px solid var(--crimson);cursor:pointer;
+}
+
+.run{
+  align-self:flex-start;
+  display:flex;align-items:baseline;gap:12px;
+  background:var(--crimson);color:#FBF6EC;
+  border:none;border-radius:10px;cursor:pointer;
+  padding:14px 26px;transition:background .18s,transform .06s;
+}
+.run:hover{background:var(--crimson-bright)}
+.run:active{transform:translateY(1px)}
+.run:disabled{background:var(--ink-faint);cursor:default}
+.run-label{font-family:var(--sans);font-size:17px;font-weight:600}
+.run-sub{font-family:var(--latin);font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.7}
+
+/* ---------- denoising stage ---------- */
+.stage{
+  position:relative;
+  background:var(--stage);
+  border:1px solid #0c0d11;
+  border-radius:var(--radius);
+  padding:calc(var(--sp)*.9);
+  min-height:260px;
+  box-shadow:inset 0 0 90px rgba(0,0,0,.45);
+  overflow:hidden;
+}
+.hud{
+  display:flex;align-items:center;gap:14px;
+  color:var(--stage-mut);font-family:var(--latin);font-size:12px;
+  letter-spacing:.06em;padding-bottom:14px;margin-bottom:16px;
+  border-bottom:1px solid var(--stage-line);flex-wrap:wrap;
+}
+.hud b{color:var(--stage-ink);font-weight:600;font-variant-numeric:tabular-nums}
+.hud-item{white-space:nowrap}
+.hud-sep{width:1px;height:12px;background:var(--stage-line)}
+.hud .mono{font-family:var(--latin);text-transform:uppercase;letter-spacing:.16em;font-size:11px}
+.progress{flex:1;min-width:80px;height:2px;background:var(--stage-line);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;width:0;background:var(--crimson-bright);transition:width .12s linear}
+
+/* the stage renders as FLOWING TEXT so Devanagari shapes/conjoins across tokens
+   (हा + म् + रो -> हाम्रो). Only masked positions are separate spans. */
+.grid{
+  font-family:var(--sans);font-size:clamp(22px,3vw,28px);line-height:1.95;
+  color:var(--stage-ink);
+  white-space:pre-wrap;word-break:break-word;
+  min-height:1.95em;
+}
+.grid .r{transition:color .3s}                 /* a run of consecutive revealed tokens */
+.grid .r.a{color:#9FB2D6}                       /* prompt anchors */
+.grid .r.grew{animation:materialize .55s ease-out}
+.grid .m{                                       /* a single masked position */
+  display:inline-block;min-width:.72em;text-align:center;
+  color:var(--stage-mut);opacity:.5;
+}
+/* glow-only pulse: settled text stays ink, newly-grown run shimmers briefly.
+   (color stays put so appending a token to a long run doesn't re-flash it all) */
+@keyframes materialize{
+  0%{text-shadow:0 0 11px rgba(193,54,43,.6),0 0 3px rgba(193,54,43,.4)}
+  60%{text-shadow:0 0 6px rgba(231,225,211,.3)}
+  100%{text-shadow:none}
+}
+
+.stage-empty{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;text-align:center;
+  color:var(--stage-mut);
+}
+.stage-empty p{margin:0;font-family:var(--sans);font-size:18px}
+.stage-empty .mut{font-family:var(--latin);font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--stage-line);color:#3c414d}
+.stage.busy .stage-empty{display:none}
+
+/* ---------- readable output ---------- */
+.output-head{
+  display:flex;align-items:center;gap:14px;justify-content:center;
+  font-family:var(--latin);font-size:11px;text-transform:uppercase;
+  letter-spacing:.2em;color:var(--ink-faint);margin-bottom:16px;
+}
+.output-head .rule{height:1px;flex:1;background:var(--line)}
+.reading{
+  font-family:var(--serif);font-size:clamp(20px,2.8vw,26px);
+  line-height:2;color:var(--ink);margin:0;
+  text-wrap:pretty;
+}
+
+/* ---------- footer ---------- */
+.site-foot{
+  position:relative;z-index:1;margin-top:auto;
+  padding-top:calc(var(--sp));
+}
+.range{display:block;width:100%;height:56px;color:var(--line);}
+.site-foot p{
+  text-align:center;font-family:var(--latin);font-size:12px;
+  letter-spacing:.08em;color:var(--ink-faint);
+  padding:6px var(--sp) calc(var(--sp)*1.2);margin:0;
+}
+
+@media (max-width:640px){
+  .sliders{grid-template-columns:repeat(2,1fr)}
+  .grid{font-size:21px}
+}
+@media (prefers-reduced-motion:reduce){
+  .cell.flash{animation:none}
+  .progress-fill{transition:none}
+}

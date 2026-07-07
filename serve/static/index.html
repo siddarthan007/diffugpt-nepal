@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>देवनागरी · Nepali Diffusion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600;700&family=Noto+Sans+Devanagari:wght@400;500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="site-head">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 44 44" aria-hidden="true">
+        <!-- abstract denoise mark: mask blocks (left) resolving into ink (right) -->
+        <rect x="2"  y="4"  width="8" height="8" rx="1.5" fill="currentColor" opacity="1"/>
+        <rect x="2"  y="18" width="8" height="8" rx="1.5" fill="currentColor" opacity="1"/>
+        <rect x="2"  y="32" width="8" height="8" rx="1.5" fill="currentColor" opacity="1"/>
+        <rect x="14" y="4"  width="8" height="8" rx="1.5" fill="currentColor" opacity=".55"/>
+        <rect x="14" y="18" width="8" height="8" rx="1.5" fill="currentColor" opacity=".55"/>
+        <rect x="26" y="4"  width="8" height="8" rx="1.5" fill="currentColor" opacity=".28"/>
+        <rect x="26" y="18" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".5"/>
+        <rect x="26" y="32" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".5"/>
+        <rect x="14" y="32" width="8" height="8" rx="1.5" fill="currentColor" opacity=".55"/>
+      </svg>
+      <div class="brand-text">
+        <h1 lang="ne">देवनागरी डिफ्युजन</h1>
+        <p class="tag">A masked-diffusion language model for Nepali · <span id="mode-badge" class="badge">…</span></p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- controls -->
+    <section class="panel controls">
+      <div class="field field-prompt">
+        <label for="prompt">प्रम्प्ट <span>prompt (optional)</span></label>
+        <input id="prompt" type="text" lang="ne" placeholder="नेपाली साहित्य…" autocomplete="off" />
+      </div>
+      <div class="row sliders">
+        <div class="field">
+          <label for="length">लम्बाइ <span id="length-val">120</span></label>
+          <input id="length" type="range" min="40" max="256" step="8" value="120" />
+        </div>
+        <div class="field">
+          <label for="steps">चरण <span id="steps-val">64</span></label>
+          <input id="steps" type="range" min="16" max="128" step="8" value="64" />
+        </div>
+        <div class="field">
+          <label for="temp">ताप <span id="temp-val">0.8</span></label>
+          <input id="temp" type="range" min="0.4" max="1.2" step="0.05" value="0.8" />
+        </div>
+        <div class="field">
+          <label for="speed">गति <span id="speed-val">normal</span></label>
+          <input id="speed" type="range" min="0" max="4" step="1" value="2" />
+        </div>
+      </div>
+      <button id="run" class="run">
+        <span class="run-label">उत्पन्न गर्नुहोस्</span>
+        <span class="run-sub">generate</span>
+      </button>
+    </section>
+
+    <!-- denoising stage -->
+    <section class="stage" id="stage">
+      <div class="hud">
+        <span class="hud-item">चरण <b id="hud-step">–</b></span>
+        <span class="hud-sep"></span>
+        <span class="hud-item">मास्क <b id="hud-mask">100%</b></span>
+        <span class="hud-sep"></span>
+        <span class="hud-item mono" id="hud-state">प्रतीक्षारत</span>
+        <div class="progress"><div class="progress-fill" id="progress"></div></div>
+      </div>
+      <div class="grid" id="grid" lang="ne"></div>
+      <div class="stage-empty" id="stage-empty">
+        <p lang="ne">तल्लो प्यानलबाट सुरु गर्नुहोस्</p>
+        <p class="mut">press generate to watch the text denoise</p>
+      </div>
+    </section>
+
+    <!-- readable output (correctly shaped, single run) -->
+    <section class="panel output" id="output-panel" hidden>
+      <div class="output-head"><span class="rule"></span><span>पाठ · reading</span><span class="rule"></span></div>
+      <p class="reading" id="reading" lang="ne"></p>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <svg class="range" viewBox="0 0 1200 80" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 80 L180 26 L320 58 L470 14 L620 52 L780 20 L940 56 L1080 24 L1200 60 L1200 80 Z"
+            fill="none" stroke="currentColor" stroke-width="1.2"/>
+    </svg>
+    <p>masked discrete diffusion · MDLM / MaskGIT · <span lang="ne">नेपाली</span></p>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
