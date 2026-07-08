@@ -65,10 +65,24 @@ Reports, honestly (gen-PPL never shown alone):
 - **gen-PPL** — samples scored by frozen AR `Sakonii/distilgpt2-nepali`, shown next to the human-reference band
 - **MAUVE** — distribution similarity to held-out human Nepali, MuRIL-featurized (1.0 = indistinguishable)
 
+## Chat (optional instruction-tuning)
+
+```bash
+python finetune.py                       # SFT on Aya Nepali (Apache-2.0) -> out/ckpt_sft.pt
+python finetune.py --extra saillab/alpaca-nepali-cleaned   # +52k pairs (CC-BY-NC, non-commercial)
+python serve/server.py                   # auto-prefers ckpt_sft.pt -> CHAT mode
+```
+LLaDA recipe: only the **response** tokens are masked/supervised; the prompt stays clean.
+At inference the prompt is given as anchor tokens and the model denoises the answer. Serving
+auto-detects the SFT checkpoint, wraps input in the `### निर्देशन: / ### उत्तर:` template, and
+shows only the answer.
+
 ## Status
-- [x] Model + training + TUI rewritten for Nepali (from-scratch masked diffusion)
+- [x] Model + training + TUI (from-scratch masked diffusion, ~50M)
 - [x] Phase-A data/tokenizer pipeline
-- [x] Training: resume + WSD + spot-safe checkpointing (running)
-- [x] FastAPI + WebSocket serving + web denoising visualization (verified in demo mode)
-- [x] Phase-D eval suite (Devanagari validity · diversity · gen-PPL · MAUVE)
-- [ ] Train to ~40k → eval → flip serve to LIVE
+- [x] Trained 40k · resume · WSD · spot-safe checkpointing
+- [x] Phase-D eval suite (validity · diversity · gen-PPL · MAUVE)
+- [x] Sampler tuned (nucleus + remask-noise) → near-human diversity, no retrain
+- [x] FastAPI + WebSocket serving + web denoising viz (conjoined Devanagari)
+- [x] Optional SFT (Aya) for chat-style behavior
+- [ ] `python serve/server.py` on pod → LIVE / CHAT

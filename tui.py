@@ -15,9 +15,11 @@ def parse_args():
     parser.add_argument("--ckpt", type=str, default="out/ckpt.pt")
     parser.add_argument("--tokenizer", type=str, default="data/nepali_bpe_16k.model")
     parser.add_argument("--len", type=int, default=120, help="total length of tokens to decode")
-    parser.add_argument("--steps", type=int, default=64, help="number of denoising steps")
-    parser.add_argument("--temp", type=float, default=0.8, help="creativity temperature")
-    parser.add_argument("--top_k", type=int, default=15, help="top-k filtering token pool")
+    parser.add_argument("--steps", type=int, default=128, help="number of denoising steps")
+    parser.add_argument("--temp", type=float, default=1.0, help="creativity temperature")
+    parser.add_argument("--top_k", type=int, default=0, help="top-k pool (0 = off, use top_p)")
+    parser.add_argument("--top_p", type=float, default=0.92, help="nucleus sampling threshold")
+    parser.add_argument("--noise", type=float, default=0.5, help="remask gumbel noise (anti-repetition)")
     parser.add_argument("--delay", type=float, default=0.05, help="animation delay per step")
     parser.add_argument("--prompt", type=str, default="", help="prefix prompt to continue")
     # Gibberish restoration / denoising mode
@@ -92,10 +94,7 @@ def main():
             with torch.no_grad():
                 logits = model(x_t, t) / cli_args.temp
                 logits[..., mask_id] = -float("Inf")
-                if cli_args.top_k is not None:
-                    v, _ = torch.topk(logits, min(cli_args.top_k, logits.size(-1)))
-                    logits[logits < v[:, :, [-1]]] = -float("Inf")
-
+                logits = model._filter_logits(logits, cli_args.top_k or None, cli_args.top_p)
                 probs = F.softmax(logits, dim=-1)
                 dist = torch.distributions.Categorical(probs.view(-1, probs.size(-1)))
                 x_0_pred = dist.sample().view(1, seq_len)
@@ -103,7 +102,7 @@ def main():
             currently_masked = x_t == mask_id
             chosen_probs = torch.gather(probs, 2, x_0_pred.unsqueeze(-1)).squeeze(-1)
             gumbel_noise = -torch.log(-torch.log(torch.rand_like(chosen_probs) + 1e-9) + 1e-9)
-            confidence = chosen_probs + (0.1 * gumbel_noise)
+            confidence = chosen_probs + (cli_args.noise * gumbel_noise)
             confidence = confidence.masked_fill(~currently_masked, -float("inf"))
 
             order = torch.argsort(confidence, dim=1, descending=True)

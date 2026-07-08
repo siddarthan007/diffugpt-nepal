@@ -22,20 +22,24 @@ import uvicorn
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 STATIC = os.path.join(HERE, "static")
-CKPT = os.path.join(REPO, "out", "ckpt.pt")
 TOK = os.path.join(REPO, "data", "nepali_bpe_16k.model")
+# prefer the instruction-tuned model, then best-val, then latest
+CKPT_CANDIDATES = [os.path.join(REPO, "out", f) for f in ("ckpt_sft.pt", "ckpt_best.pt", "ckpt.pt")]
+CKPT = next((c for c in CKPT_CANDIDATES if os.path.exists(c)), CKPT_CANDIDATES[-1])
 
 # --- try to bring up the real model; fall back to DEMO cleanly ---------------
 MODEL = None
 SP = None
 DEVICE = "cpu"
 MASK_ID = None
+CHAT = False   # True when serving an instruction-tuned checkpoint
 
 try:
     import sys
-    sys.path.insert(0, REPO)          # so `import model` resolves from the repo root
+    sys.path.insert(0, REPO)          # so `import model` / `import prompt_format` resolve
     import torch  # noqa
     import sentencepiece as spm
+    import prompt_format as PF
     if os.path.exists(TOK):
         SP = spm.SentencePieceProcessor(model_file=TOK)
     if os.path.exists(CKPT) and SP is not None:
@@ -51,11 +55,12 @@ try:
         MODEL.load_state_dict(sd)
         MODEL.eval()
         MASK_ID = MODEL.mask_token_id
+        CHAT = bool(ckpt.get("sft", False))
 except Exception as e:  # noqa
     print(f"(model/tokenizer not fully available -> DEMO mode: {type(e).__name__}: {e})")
 
 MODE = "live" if MODEL is not None else "demo"
-print(f"[server] mode = {MODE.upper()}  device={DEVICE}")
+print(f"[server] mode = {MODE.upper()}{' + CHAT' if CHAT else ''}  ckpt={os.path.basename(CKPT)}  device={DEVICE}")
 
 # --- Devanagari helpers ------------------------------------------------------
 _COMBINING = set(range(0x0900, 0x0904)) | set(range(0x093A, 0x0950)) | \
@@ -91,7 +96,12 @@ def cosine_keep(frac):
 def frames_live(params):
     import torch
     prompt = params.get("prompt", "").strip()
-    prompt_ids = SP.encode(prompt) if prompt else []
+    # CHAT: wrap the user message in the instruction template so the denoised region
+    # is the ANSWER (prompt tokens are anchors, exactly as during SFT).
+    if CHAT and prompt:
+        prompt_ids = PF.build_prompt_ids(SP, prompt)
+    else:
+        prompt_ids = SP.encode(prompt) if prompt else []
     seq_len = int(params.get("length", 120))
     steps = int(params.get("steps", 64))
 
@@ -99,10 +109,12 @@ def frames_live(params):
         p = SP.id_to_piece(int(i))
         return " " if p == "<eod>" else p.replace("▁", " ")
 
+    # Tuned decoding (eval sweep winner "B"): pure nucleus + high remask noise beats
+    # the repetition collapse. top_k disabled in favor of top_p.
     with torch.no_grad():
         for fr in MODEL.sample_stream(batch_size=1, seq_len=seq_len, num_steps=steps,
-                                      temperature=float(params.get("temperature", 0.8)),
-                                      top_k=int(params.get("top_k", 20)),
+                                      temperature=float(params.get("temperature", 1.0)),
+                                      top_k=None, top_p=0.92, remask_noise=0.5,
                                       device=DEVICE, prompt_ids=prompt_ids):
             x = fr["x_t"][0].tolist()
             newly = fr["newly"][0].tolist()
@@ -116,6 +128,8 @@ def frames_live(params):
                     s = "anchor" if anch[i] else ("new" if newly[i] else "revealed")
                     toks.append({"t": piece(idv), "s": s, "c": round(float(conf[i]), 3)})
             text = SP.decode([idv for idv in x if idv < MASK_ID])
+            if CHAT:  # show only the answer, not the template scaffold
+                text = PF.strip_response(text)
             mask_pct = 100.0 * sum(1 for idv in x if idv == MASK_ID) / max(1, len(x))
             yield {"type": "frame", "step": fr["step"], "total": fr["total"],
                    "mask_pct": round(mask_pct, 1), "tokens": toks, "text": text}
@@ -179,7 +193,7 @@ async def index():
 
 @app.get("/api/mode")
 async def mode():
-    return {"mode": MODE, "device": DEVICE}
+    return {"mode": MODE, "device": DEVICE, "chat": CHAT}
 
 
 @app.websocket("/ws")
@@ -219,4 +233,4 @@ async def ws(websocket: WebSocket):
 app.mount("/", StaticFiles(directory=STATIC), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

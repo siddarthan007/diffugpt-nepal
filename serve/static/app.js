@@ -26,8 +26,9 @@ bind(el.speed, "speed-val", (v) => SPEED_LABEL[v]);
 
 // mode badge
 fetch("/api/mode").then((r) => r.json()).then((d) => {
-  el.badge.textContent = d.mode === "live" ? "live model" : "demo";
-  el.badge.classList.add(d.mode);
+  el.badge.textContent = d.chat ? "chat" : (d.mode === "live" ? "live model" : "demo");
+  el.badge.classList.add(d.chat ? "live" : d.mode);
+  if (d.chat) el.prompt.placeholder = "प्रश्न सोध्नुहोस्…";  // "ask a question"
 }).catch(() => { el.badge.textContent = "offline"; });
 
 // ---- mask scramble loop (only touches masked spans) ----
