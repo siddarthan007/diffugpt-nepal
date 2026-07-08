@@ -167,13 +167,29 @@ class DiffusionGPT(nn.Module):
         """Cosine masked fraction for a normalized position frac in [0, 1] (inference reveal schedule)."""
         return cosine_mask_frac(float(frac))
 
+    @staticmethod
+    def _filter_logits(logits, top_k=None, top_p=None):
+        """Apply top-k then top-p (nucleus) filtering along the vocab dim (last)."""
+        if top_k is not None and top_k > 0:
+            v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+            logits = logits.masked_fill(logits < v[..., [-1]], -float('Inf'))
+        if top_p is not None and 0.0 < top_p < 1.0:
+            sorted_logits, sorted_idx = torch.sort(logits, descending=True, dim=-1)
+            cum = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+            remove = cum > top_p
+            remove[..., 1:] = remove[..., :-1].clone()  # keep the first token that crosses p
+            remove[..., 0] = False
+            remove = torch.zeros_like(remove).scatter(-1, sorted_idx, remove)
+            logits = logits.masked_fill(remove, -float('Inf'))
+        return logits
+
     # -----------------------------------------------------------------
     # Sampling
     # -----------------------------------------------------------------
     @torch.no_grad()
     def sample_stream(self, batch_size=1, seq_len=None, num_steps=None,
-                      temperature=1.0, top_k=None, device=None,
-                      prompt_ids=None):
+                      temperature=1.0, top_k=None, top_p=None, remask_noise=0.1,
+                      device=None, prompt_ids=None):
         """Iterative confidence-based (MaskGIT) unmasking. Yields the state after
         EACH denoising step so callers (TUI / web UI) can animate the reveal.
 
@@ -201,11 +217,7 @@ class DiffusionGPT(nn.Module):
             t = torch.full((batch_size,), frac, dtype=torch.float32, device=device)
             logits = self.forward(x_t, t) / temperature
             logits[..., self.mask_token_id] = -float('Inf')  # never emit the MASK token
-
-            if top_k is not None:
-                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
-                logits[logits < v[:, :, [-1]]] = -float('Inf')
-
+            logits = self._filter_logits(logits, top_k, top_p)
             probs = F.softmax(logits, dim=-1)
             dist = torch.distributions.Categorical(probs.view(-1, probs.size(-1)))
             x_0_pred = dist.sample().view(batch_size, seq_len)
@@ -213,9 +225,11 @@ class DiffusionGPT(nn.Module):
             currently_masked = (x_t == self.mask_token_id)
             chosen_probs = torch.gather(probs, 2, x_0_pred.unsqueeze(-1)).squeeze(-1)
 
-            # Gumbel-noised confidence, MaskGIT-style, only over still-masked slots
+            # Gumbel-noised confidence, MaskGIT-style, only over still-masked slots.
+            # Higher remask_noise randomizes the unmask order -> breaks the
+            # high-frequency-token-first cascade that drives repetition.
             gumbel_noise = -torch.log(-torch.log(torch.rand_like(chosen_probs) + 1e-9) + 1e-9)
-            confidence = chosen_probs + (0.1 * gumbel_noise)
+            confidence = chosen_probs + (remask_noise * gumbel_noise)
             confidence = confidence.masked_fill(~currently_masked, -float('inf'))
 
             # How many to KEEP masked after this step (cosine reveal on the next position).
@@ -250,12 +264,13 @@ class DiffusionGPT(nn.Module):
         self.train()
 
     @torch.no_grad()
-    def sample(self, batch_size, seq_len, temperature=1.0, top_k=None, device=None,
-               num_steps=None, prompt_ids=None):
+    def sample(self, batch_size, seq_len, temperature=1.0, top_k=None, top_p=None,
+               remask_noise=0.1, device=None, num_steps=None, prompt_ids=None):
         """Convenience wrapper: run the full denoise and return only the final tokens."""
         x_t = None
         for frame in self.sample_stream(batch_size=batch_size, seq_len=seq_len,
                                         num_steps=num_steps, temperature=temperature,
-                                        top_k=top_k, device=device, prompt_ids=prompt_ids):
+                                        top_k=top_k, top_p=top_p, remask_noise=remask_noise,
+                                        device=device, prompt_ids=prompt_ids):
             x_t = frame['x_t']
         return x_t

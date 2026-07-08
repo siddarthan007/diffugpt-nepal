@@ -24,6 +24,8 @@ def main():
     ap.add_argument("--steps", type=int, default=96)
     ap.add_argument("--temp", type=float, default=1.0)
     ap.add_argument("--top_k", type=int, default=50)
+    ap.add_argument("--top_p", type=float, default=None, help="nucleus sampling (e.g. 0.95)")
+    ap.add_argument("--noise", type=float, default=0.1, help="remask gumbel noise (raise to break repetition)")
     ap.add_argument("--scorer", default="Sakonii/distilgpt2-nepali")
     ap.add_argument("--quick", action="store_true", help="skip gen-PPL + MAUVE (offline metrics only)")
     ap.add_argument("--out", default="out/eval_report.json")
@@ -39,15 +41,16 @@ def main():
         pass
 
     print(f"Generating {args.n} samples (seq_len={args.seq_len}, steps={args.steps}, "
-          f"temp={args.temp}, top_k={args.top_k}) ...")
+          f"temp={args.temp}, top_k={args.top_k}, top_p={args.top_p}, noise={args.noise}) ...")
     gen = generate.generate_samples(model, sp, args.n, seq_len=args.seq_len, steps=args.steps,
-                                    temperature=args.temp, top_k=args.top_k, device=device)
+                                    temperature=args.temp, top_k=args.top_k, top_p=args.top_p,
+                                    remask_noise=args.noise, device=device)
     refs = generate.load_references(args.ref, args.n)
     print(f"  references loaded: {len(refs)}")
 
     report = {"ckpt": args.ckpt, "step": step, "n_samples": len(gen),
-              "gen_config": {"seq_len": args.seq_len, "steps": args.steps,
-                             "temp": args.temp, "top_k": args.top_k}}
+              "gen_config": {"seq_len": args.seq_len, "steps": args.steps, "temp": args.temp,
+                             "top_k": args.top_k, "top_p": args.top_p, "noise": args.noise}}
 
     # --- offline: Devanagari validity + word-rate + diversity ---
     report["devanagari"] = devanagari.report(gen)

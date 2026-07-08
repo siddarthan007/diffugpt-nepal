@@ -28,14 +28,15 @@ def load_model(ckpt_path, tok_path, device=None):
 
 @torch.no_grad()
 def generate_samples(model, sp, n, seq_len=120, steps=96, temperature=1.0, top_k=50,
-                     device="cuda", batch_size=16):
+                     top_p=None, remask_noise=0.1, device="cuda", batch_size=16):
     mask_id = model.mask_token_id
     out = []
     done = 0
     while done < n:
         b = min(batch_size, n - done)
         ids = model.sample(batch_size=b, seq_len=seq_len, temperature=temperature,
-                           top_k=top_k, num_steps=steps, device=device)
+                           top_k=top_k, top_p=top_p, remask_noise=remask_noise,
+                           num_steps=steps, device=device)
         for row in ids.tolist():
             out.append(sp.decode([t for t in row if t < mask_id]).strip())
         done += b
