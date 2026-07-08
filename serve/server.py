@@ -107,7 +107,11 @@ def frames_live(params):
 
     def piece(i):
         p = SP.id_to_piece(int(i))
-        return " " if p == "<eod>" else p.replace("▁", " ")
+        if p == "<eod>":
+            return " "
+        if p.startswith("<0x") and p.endswith(">"):   # byte-fallback (e.g. stray ASCII) -> hide
+            return ""
+        return p.replace("▁", " ")
 
     # Tuned decoding (eval sweep winner "B"): pure nucleus + high remask noise beats
     # the repetition collapse. top_k disabled in favor of top_p.
@@ -127,9 +131,10 @@ def frames_live(params):
                 else:
                     s = "anchor" if anch[i] else ("new" if newly[i] else "revealed")
                     toks.append({"t": piece(idv), "s": s, "c": round(float(conf[i]), 3)})
-            text = SP.decode([idv for idv in x if idv < MASK_ID])
-            if CHAT:  # show only the answer, not the template scaffold
-                text = PF.strip_response(text)
+            if CHAT:  # answer = the generated (non-anchor) region — position-based, robust
+                text = SP.decode([idv for i, idv in enumerate(x) if not anch[i] and idv < MASK_ID])
+            else:
+                text = SP.decode([idv for idv in x if idv < MASK_ID])
             mask_pct = 100.0 * sum(1 for idv in x if idv == MASK_ID) / max(1, len(x))
             yield {"type": "frame", "step": fr["step"], "total": fr["total"],
                    "mask_pct": round(mask_pct, 1), "tokens": toks, "text": text}

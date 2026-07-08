@@ -56,7 +56,11 @@ def main():
     decode = lambda l: sp.decode([int(t) for t in l if int(t) < mask_id])
     def piece(i):
         p = sp.id_to_piece(int(i))
-        return " " if p == "<eod>" else p.replace("▁", " ")  # ▁ -> space, <eod> -> space
+        if p == "<eod>":
+            return " "
+        if p.startswith("<0x") and p.endswith(">"):  # byte-fallback token -> hide
+            return ""
+        return p.replace("▁", " ")
 
     is_gibberish_mode = len(cli_args.gibberish) > 0
 

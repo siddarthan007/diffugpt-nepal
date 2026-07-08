@@ -73,13 +73,19 @@ def _extra_dataset(repo):
     print(f"  extra ({repo}): {n} pairs")
 
 
-def build_examples(sp, eod_id, max_len, extra=None):
+def build_examples(sp, eod_id, max_len, extra=None, min_deva=0.6, max_foreign=0.12):
+    from evaluation.devanagari import analyze
     pairs = list(_aya_nepali())
     if extra:
         pairs += list(_extra_dataset(extra))
     ex = []
-    skipped = 0
+    skipped = junk = 0
     for instr, ans in pairs:
+        # drop machine-translation junk: answers that are English/code-heavy or too short
+        a = analyze(ans)
+        if len(ans.strip()) < 8 or a["devanagari_ratio"] < min_deva or a["foreign_ratio"] > max_foreign:
+            junk += 1
+            continue
         full, mask = PF.build_example_ids(sp, instr, ans, eod_id)
         if len(full) > max_len:
             full, mask = full[:max_len], mask[:max_len]
@@ -90,7 +96,7 @@ def build_examples(sp, eod_id, max_len, extra=None):
         full = full + [eod_id] * pad
         mask = mask + [False] * pad
         ex.append((full, mask))
-    print(f"  usable SFT examples: {len(ex)} (skipped {skipped})")
+    print(f"  usable SFT examples: {len(ex)}  (dropped {junk} junk/foreign, {skipped} truncated)")
     return ex
 
 
@@ -100,10 +106,12 @@ def main():
     ap.add_argument("--out", default="out/ckpt_sft.pt")
     ap.add_argument("--tok", default="data/nepali_bpe_16k.model")
     ap.add_argument("--extra", default=None, help="optional extra HF instruction dataset (may be non-commercial)")
-    ap.add_argument("--epochs", type=int, default=8)
+    ap.add_argument("--epochs", type=int, default=5)
     ap.add_argument("--batch", type=int, default=32)
-    ap.add_argument("--lr", type=float, default=1e-4)
+    ap.add_argument("--lr", type=float, default=6e-5)      # lower -> stabler than 1e-4
     ap.add_argument("--max_len", type=int, default=256)
+    ap.add_argument("--min_deva", type=float, default=0.6, help="min Devanagari ratio of answer")
+    ap.add_argument("--max_foreign", type=float, default=0.12, help="max foreign-letter ratio of answer")
     ap.add_argument("--t_eps", type=float, default=1e-3)
     ap.add_argument("--compile", action="store_true")
     args = ap.parse_args()
@@ -120,7 +128,8 @@ def main():
     assert args.max_len <= margs.block_size
 
     print("Building SFT set from Aya (Nepali) ...")
-    examples = build_examples(sp, eod_id, args.max_len, extra=args.extra)
+    examples = build_examples(sp, eod_id, args.max_len, extra=args.extra,
+                              min_deva=args.min_deva, max_foreign=args.max_foreign)
     if len(examples) < 16:
         print("!! Very few Nepali SFT examples — behavior tuning will be weak. "
               "Consider --extra saillab/alpaca-nepali-cleaned (non-commercial).")
@@ -160,6 +169,12 @@ def main():
         per_ex = (1.0 / t) * (ce * mask_flags.float()).sum(dim=1) / resp
         return per_ex.mean()
 
+    def save_sft(path, step):
+        raw = model._orig_mod if hasattr(model, "_orig_mod") else model
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        torch.save({"model": raw.state_dict(), "args": margs, "step": step,
+                    "sft": True, "template": PF.PROMPT_TEMPLATE}, path)
+
     print(f"SFT: {n} examples | {args.epochs} epochs | {total_steps} steps")
     model.train()
     step = 0
@@ -187,15 +202,18 @@ def main():
                            device=device, prompt_ids=pid)
         ans = PF.strip_response(sp.decode([t for t in ids[0].tolist() if t < mask_id]))
         model.train()
+        # save this epoch as a snapshot AND as the latest (args.out)
+        snap = os.path.join(os.path.dirname(args.out) or ".", f"ckpt_sft_e{epoch+1}.pt")
+        save_sft(snap, step)
+        save_sft(args.out, step)
         print(f"[epoch {epoch+1}/{args.epochs}] loss {loss.item():.4f} | "
-              f"{time.time()-t0:.0f}s\n   Q: नेपाली साहित्यको बारेमा...\n   A: {ans[:200]!r}")
+              f"{time.time()-t0:.0f}s | saved {os.path.basename(snap)}"
+              f"\n   Q: नेपाली साहित्यको बारेमा...\n   A: {ans[:200]!r}")
 
-    raw = model._orig_mod if hasattr(model, "_orig_mod") else model
-    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
-    torch.save({"model": raw.state_dict(), "args": margs, "step": step,
-                "sft": True, "template": PF.PROMPT_TEMPLATE}, args.out)
-    print(f"\nSaved SFT model -> {args.out}")
-    print("Serve it: python serve/server.py  (auto-prefers ckpt_sft.pt -> chat mode)")
+    print(f"\nSaved SFT model -> {args.out} (+ per-epoch snapshots ckpt_sft_e*.pt)")
+    print("Pick the cleanest epoch by its sample above, then:")
+    print("   cp out/ckpt_sft_eN.pt out/ckpt_sft.pt   # if not the last")
+    print("Serve it: bash run.sh   (auto-prefers ckpt_sft.pt -> chat mode)")
 
 
 if __name__ == "__main__":

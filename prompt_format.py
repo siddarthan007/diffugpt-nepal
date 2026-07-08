@@ -3,11 +3,15 @@
 The model is a masked-diffusion LM, so "chat" = give the prompt as CLEAN anchor tokens
 and let the model denoise the answer region (LLaDA-style: during SFT only the response
 is masked/supervised; the prompt is never masked).
+
+IMPORTANT: the tokenizer is Devanagari-only with byte_fallback. ASCII characters like
+'#', ':' and '\\n' have NO real tokens and fall back to raw byte tokens (<0x23> etc.),
+which both display badly and give the model out-of-distribution anchors. So the template
+uses ONLY Devanagari words + spaces: प्रश्नः ("question:") and उत्तरः ("answer:").
 """
 
-# निर्देशन = "instruction", उत्तर = "answer". Plain text markers (tokenized normally).
-PROMPT_TEMPLATE = "### निर्देशन:\n{instruction}\n\n### उत्तर:\n"
-RESPONSE_MARKER = "### उत्तर:\n"
+PROMPT_TEMPLATE = "प्रश्नः {instruction} उत्तरः "
+RESPONSE_MARKER = "उत्तरः"
 
 
 def build_prompt_ids(sp, instruction):
@@ -26,8 +30,9 @@ def build_example_ids(sp, instruction, answer, eod_id):
 
 
 def strip_response(text):
-    """For display: keep only what follows the answer marker."""
-    i = text.rfind("### उत्तर:")
+    """For display fallback: keep only what follows the answer marker. (Serving prefers
+    position-based extraction via the anchor mask, which is collision-proof.)"""
+    i = text.rfind(RESPONSE_MARKER)
     if i >= 0:
-        text = text[i + len("### उत्तर:"):]
-    return text.lstrip("\n").strip()
+        text = text[i + len(RESPONSE_MARKER):]
+    return text.strip()

@@ -45,8 +45,13 @@ Gated sources need `huggingface-cli login`; any failing source is skipped, not f
 ## Web UI
 
 ```bash
+bash run.sh                # picks best ckpt, prints URL, starts server (Ctrl-C to stop)
+bash run.sh --tmux         # detached (survives SSH drop); attach: tmux attach -t nepali
+bash run.sh --port 7860 --install
+# or directly:
 python serve/server.py     # http://localhost:8000
 ```
+On RunPod, `run.sh` prints the `https://<POD_ID>-<PORT>.proxy.runpod.net` URL — expose that port as HTTP.
 FastAPI + WebSocket streams each denoising step to the browser. Auto-detects mode:
 **LIVE** if `out/ckpt.pt` + tokenizer exist, else **DEMO** (synthetic denoise over sample
 Nepali text — the UI works before training). Editorial paper aesthetic, dark denoising
