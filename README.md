@@ -52,8 +52,23 @@ FastAPI + WebSocket streams each denoising step to the browser. Auto-detects mod
 Nepali text — the UI works before training). Editorial paper aesthetic, dark denoising
 stage with per-akshara reveal animation + a correctly-shaped reading panel below.
 
+## Evaluation
+
+```bash
+python -m evaluation.run --ckpt out/ckpt_best.pt --n 300        # full suite
+python -m evaluation.run --ckpt out/ckpt.pt --n 100 --quick     # offline metrics only (no GPU scorers)
+```
+Reports, honestly (gen-PPL never shown alone):
+- **Devanagari validity** — % well-formed script, NFC-stable, orphan-combining rate (target >99%)
+- **Dictionary word-rate** — % generated words in the corpus lexicon (zero-dependency)
+- **Diversity** — distinct-1/2/3, rep-3/4, self-BLEU (catches degenerate repetition that gen-PPL rewards)
+- **gen-PPL** — samples scored by frozen AR `Sakonii/distilgpt2-nepali`, shown next to the human-reference band
+- **MAUVE** — distribution similarity to held-out human Nepali, MuRIL-featurized (1.0 = indistinguishable)
+
 ## Status
 - [x] Model + training + TUI rewritten for Nepali (from-scratch masked diffusion)
 - [x] Phase-A data/tokenizer pipeline
+- [x] Training: resume + WSD + spot-safe checkpointing (running)
 - [x] FastAPI + WebSocket serving + web denoising visualization (verified in demo mode)
-- [ ] Run Phase A → train → eval → flip serve to LIVE
+- [x] Phase-D eval suite (Devanagari validity · diversity · gen-PPL · MAUVE)
+- [ ] Train to ~40k → eval → flip serve to LIVE

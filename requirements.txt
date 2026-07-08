@@ -10,7 +10,13 @@ requests>=2.31
 datasketch>=1.6           # MinHash + LSH fuzzy dedup
 indic-nlp-library>=0.92   # Devanagari normalization
 
-# --- serving / eval (later phases) ---
+# --- serving ---
 fastapi>=0.111
 uvicorn[standard]>=0.30
-mauve-text>=0.4           # eval only
+
+# --- eval only ---
+mauve-text>=0.4           # distribution similarity
+transformers>=4.40        # gen-PPL scorer (Sakonii/distilgpt2-nepali) + MAUVE featurizer
+accelerate>=0.30
+sacrebleu>=2.4            # self-BLEU (optional)
+scikit-learn>=1.3         # mauve dependency
